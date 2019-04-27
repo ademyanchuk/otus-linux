@@ -1,0 +1,39 @@
+- Check current release and kernel version
+$ cat /etc/redhat-release
+CentOS Linux release 7.6.1810 (Core) 
+$ uname -r
+3.10.0-957.5.1.el7.x86_64
+
+- Update system
+# yum update
+
+- Install nesesary tools
+# yum install -y ncurses-devel make gcc bc bison flex elfutils-libelf-devel openssl-devel grub2
+
+- Install wget
+# yum install wget
+
+- Download longterm kernel to /usr/src
+# cd /usr/src
+# wget https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.19.36.tar.xz
+# tar -xvf linux-4.19.36.tar.xz
+# cd linux-4.19.36
+
+- Instal rpm-build tool (dependency for package building)
+# yum install rpm-build
+
+-  Copy current config file
+# cp -v /boot/config-3.10.0-957.10.1.el7.x86_64 .config
+
+-  run the make menuconfig command to configure the Linux kernel
+# make menuconfig
+
+- Compilation and Make rpm packages for futher kernel building
+# make rpm-pkg
+
+- install the rpm packages and reboot
+# rpm -iUv /root/rpmbuild/RPMS/x86_64/*.rpm
+
+- uname -r
+Linux 4.19.36
+
