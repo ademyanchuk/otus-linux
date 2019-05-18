@@ -1,0 +1,10 @@
+Steps for creating gpt and partitions
+
+# make a gpt
+sudo parted -s /dev/sdf mklabel gpt
+
+# make a partition
+sudo parted -s /dev/sdf mkpart name0 ext4 1MiB 50MiB 
+
+You can make desired number of partitions applying this command 
+with different arguments.
