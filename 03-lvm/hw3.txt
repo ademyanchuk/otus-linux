@@ -1,0 +1,41 @@
+1. Уменьшаем том под / до 8 ГБ
+   - Установим xfsdump -- yum install xfsdump
+   
+   - Готовим временный том для / 
+ pvcreate /dev/sdb
+ vgcreate vg_root /dev/sdb
+ lvcreate -n lv_root -l +100%FREE /dev/vg_root
+   
+   - Создаем файловую систему и монтируем
+ mkfs.xfs /dev/vg_root/lv_root
+ mount /dev/vg_root/lv_root /mnt
+   
+   - Копируем данные из раздела / в раздел /mnt
+ xfsdump -J - /dev/VolGroup00/LogVol00 | xfsrestore -J - /mnt
+   
+   - Имитируем текущий / , делаем chroot в него и обновляем grub
+ for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done
+
+   - Обновляем образ initrd (для того чтобы обновить все имеющиеся в системе initrd используется цикл)
+ cd /boot/; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;s/.img//g"` --force; done
+
+   - Обновляем информацию в /boot/grub2/grub.cfg
+ меняем  rd.lvm.lv=VolGroup00/LogVol00 на rd.lvm.lv=vg_root/lv_root
+
+   - Изменяем размер старой VG, для этого удаляем LogVol00 на 40ГБ и создаем ноый на 8ГБ
+ lvremove /dev/VolGroup00/LogVol00
+ lvcreate -n VolGroup00/LogVol00 -L 8G /dev/VolGroup00
+
+   - Создаем файловую систему, монтируем и копируем данные из временного рута
+ mkfs.xfs /dev/VolGroup00/LogVol00
+ mount /dev/VolGroup00/LogVol00 /mnt/
+ xfsdump -J - /dev/vg_root/lv_root | xfsrestore -J - /mnt
+
+   - Имитируем текущий / , делаем chroot в него и обновляем grub
+ for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done
+ chroot /mnt
+ grub2-mkconfig -o /boot/grub2/grub.cfg
+
+   - Обновляем образ initrd (для того чтобы обновить все имеющиеся в системе initrd используется цикл)
+ cd /boot ; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;s/.img//g"` --force; done 
+ 
