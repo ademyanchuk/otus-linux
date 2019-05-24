@@ -1,41 +1,89 @@
-1. Уменьшаем том под / до 8 ГБ
-   - Установим xfsdump -- yum install xfsdump
+﻿1. Уменьшаем том под / до 8 ГБ
+   - Установим xfsdump
+# yum install xfsdump
    
    - Готовим временный том для / 
- pvcreate /dev/sdb
- vgcreate vg_root /dev/sdb
- lvcreate -n lv_root -l +100%FREE /dev/vg_root
+# pvcreate /dev/sdb
+# vgcreate vg_root /dev/sdb
+# lvcreate -n lv_root -l +100%FREE /dev/vg_root
    
    - Создаем файловую систему и монтируем
- mkfs.xfs /dev/vg_root/lv_root
- mount /dev/vg_root/lv_root /mnt
+# mkfs.xfs /dev/vg_root/lv_root
+# mount /dev/vg_root/lv_root /mnt
    
    - Копируем данные из раздела / в раздел /mnt
- xfsdump -J - /dev/VolGroup00/LogVol00 | xfsrestore -J - /mnt
+# xfsdump -J - /dev/VolGroup00/LogVol00 | xfsrestore -J - /mnt
    
    - Имитируем текущий / , делаем chroot в него и обновляем grub
- for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done
+# for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done
+# chroot /mnt/
+# grub2-mkconfig -o /boot/grub2/grub.cfg
 
    - Обновляем образ initrd (для того чтобы обновить все имеющиеся в системе initrd используется цикл)
- cd /boot/; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;s/.img//g"` --force; done
+# cd /boot/; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;s/.img//g"` --force; done
 
    - Обновляем информацию в /boot/grub2/grub.cfg
- меняем  rd.lvm.lv=VolGroup00/LogVol00 на rd.lvm.lv=vg_root/lv_root
+# меняем  rd.lvm.lv=VolGroup00/LogVol00 на rd.lvm.lv=vg_root/lv_root
+# перезагрузка!
 
    - Изменяем размер старой VG, для этого удаляем LogVol00 на 40ГБ и создаем ноый на 8ГБ
- lvremove /dev/VolGroup00/LogVol00
- lvcreate -n VolGroup00/LogVol00 -L 8G /dev/VolGroup00
+# lvremove /dev/VolGroup00/LogVol00
+# lvcreate -n VolGroup00/LogVol00 -L 8G /dev/VolGroup00
 
    - Создаем файловую систему, монтируем и копируем данные из временного рута
- mkfs.xfs /dev/VolGroup00/LogVol00
- mount /dev/VolGroup00/LogVol00 /mnt/
- xfsdump -J - /dev/vg_root/lv_root | xfsrestore -J - /mnt
+# mkfs.xfs /dev/VolGroup00/LogVol00
+# mount /dev/VolGroup00/LogVol00 /mnt/
+# xfsdump -J - /dev/vg_root/lv_root | xfsrestore -J - /mnt
 
    - Имитируем текущий / , делаем chroot в него и обновляем grub
- for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done
- chroot /mnt
- grub2-mkconfig -o /boot/grub2/grub.cfg
+# for i in /proc/ /sys/ /dev/ /run/ /boot/; do mount --bind $i /mnt/$i; done
+# chroot /mnt
+# grub2-mkconfig -o /boot/grub2/grub.cfg
 
    - Обновляем образ initrd (для того чтобы обновить все имеющиеся в системе initrd используется цикл)
- cd /boot ; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;s/.img//g"` --force; done 
- 
+# cd /boot ; for i in `ls initramfs-*img`; do dracut -v $i `echo $i|sed "s/initramfs-//g;s/.img//g"` --force; done
+
+2. Выделить том под /var + mirror
+   - создаем зеркало
+# pvcreate /dev/sdc /dev/sdd
+# vgcreate vg_var /dev/sdc /dev/sdd
+# lvcreate -L 950M -m1 -n lv_var vg_var
+   
+   - создаем на нем файловую систему и перемещаем туда /var
+# mkfs.ext4 /dev/vg_var/lv_var
+# mount /dev/vg_var/lv_var /mnt
+# cp -aR /var/* /mnt/
+
+   - монтируем новый var в каталог /var и правим fstab для автоматического монтирования
+# umount /mnt
+# mount /dev/vg_var/lv_var /var
+# echo "`blkid | grep var: | awk '{print$2}'` /var ext4 defaults 0 0" >> /etc/fstab
+
+   - удаляем временную VG, которая создавалась для переноса /
+# lvremove /dev/vg_root/lv_root
+# vgremove /dev/vg_root
+# pvremove /dev/sdb
+
+3. Выделить том под /home
+   - создаем логический том под /home, создаем файловую систему, монтируем в /mnt, копируем содержание /home
+# lvcreate -n LogVol_Home -L 2G /dev/VolGroup00
+# mkfs.ext4 /dev/VolGroup00/LogVol_Home
+# mount /dev/VolGroup00/LogVol_Home /mnt
+# cp -aR /home/* /mnt/
+
+   - размонтируем, монтируем логический том LogVol_Home в точку /home, правим fstab для автомонтирования при запуске
+# umount /mnt
+# mount /dev/VolGroup00/LogVol_Home /home
+# echo "`blkid | grep Home | awk '{print$2}'` /home ext4 defaults 0 0" >> /etc/fstab
+
+4. В /home сделать том для снэпшотов
+   - создаем файлы в /home, делаем снэпшот
+# touch /home/file{1..20}
+# lvcreate -L 100MB -s -n home_snap /dev/VolGroup00/LogVol_Home
+
+   - удаляем часть файлов и восстанавливаемся со снэпшота
+# rm -rf /home/file{1..10}
+# umount /home/
+# lvconvert --merge /dev/VolGroup00/home_snap
+# mount /home
+
