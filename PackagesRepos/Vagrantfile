@@ -41,18 +41,20 @@ Vagrant.configure("2") do |config|
 # Install tools for creating your own REPO
            yum install nginx -y -q
            yum install createrepo -y -q
-# Run python script
-	   python3 /vagrant/script.py
-# Install docker-ce
-           #sudo yum install -y -q yum-utils links \
-           #device-mapper-persistent-data \
-           #lvm2
-           #sudo yum-config-manager \
-           #--add-repo \
-           #https://download.docker.com/linux/centos/docker-ce.repo
-           #yum install docker-ce docker-compose -y -q
-           #systemctl start docker
-           #docker run hello-world
+# Create a package
+	   rpmdev-setuptree
+	   # prepare hello.py for packaging
+	   mkdir /tmp/hello-0.1
+	   cp /vagrant/hello.py /tmp/hello-0.1/
+	   # create archive and move to ~/rpmbuild/SOURCES/
+	   cd /tmp
+	   tar -cvzf hello-0.1.tar.gz hello-0.1
+	   mv /tmp/hello-0.1.tar.gz ~/rpmbuild/SOURCES/
+	   # copy spec file
+	   cp /vagrant/hello.spec ~/rpmbuild/SPECS/
+       cd
+       # build package
+       rpmbuild -bb rpmbuild/SPECS/hello.spec 
       SHELL
 
       end
