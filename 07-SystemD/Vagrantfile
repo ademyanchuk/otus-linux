@@ -70,7 +70,7 @@ Vagrant.configure("2") do |config|
           # copy service and timer
           cp /vagrant/watchlog.service /etc/systemd/system
           cp /vagrant/watchlog.timer /etc/systemd/system
-          #systemctl start watchlog.timer
+          systemctl start watchlog.timer
       # spawn-fcgi
           # copy uncommented spawn-fcgi config file
           cp /vagrant/spawn-fcgi /etc/sysconfig/
@@ -80,6 +80,15 @@ Vagrant.configure("2") do |config|
           systemctl start spawn-fcgi
           systemctl status spawn-fcgi
       # apache two instances
+          # copy config files and unit file
+	  cp /vagrant/httpd@.service /etc/systemd/system
+	  cp /vagrant/httpd-* /etc/sysconfig
+	  cp /vagrant/first.conf /etc/httpd/conf/
+	  cp /vagrant/second.conf /etc/httpd/conf/
+	  # start 2 instances and check ports listened
+	  systemctl start httpd@first
+	  systemctl start httpd@second
+	  ss -tnulp | grep httpd
   	  SHELL
 
       end
